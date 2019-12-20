@@ -1,8 +1,8 @@
 #!/bin/bash
-if ! [ -f rockyou.txt ]; then
+if ! [ -f passwd_lists/rockyou.txt ]; then
   sudo apt install curl
   echo "geting dictionary"
-  curl -L -o rockyou.txt https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
+  curl -L -o passwd_lists/rockyou.txt https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
 fi
 echo cheking deps
 sudo java -jar UIAS.jar  s
