@@ -1,5 +1,6 @@
 #!/bin/bash
 if ! [ -f rockyou.txt ]; then
+  sudo apt install curl
   echo "geting dictionary"
   curl -L -o rockyou.txt https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
 fi
