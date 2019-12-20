@@ -1,5 +1,5 @@
 #!/bin/bash
-sudo apt install java
+sudo apt install default-jre
 mkdir passwd_lists
 
 sudo apt install curl
