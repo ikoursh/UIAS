@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo apt install java
 if ! [ -f passwd_lists/rockyou.txt ]; then
   sudo apt install curl
   echo "geting dictionary"
