@@ -60,10 +60,26 @@ class Main {
 
         checkdep(); //check that necessary dependencies are installed
 
-        if (args.length > 0) {
+        File wireless_interface_file = new File("WI"); //wireless interface name file
+        if(!wireless_interface_file.exists()){ //if file doesn't exist, create it and write wireless interface and monitor wireless interface to it
+            BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(wireless_interface_file));
+            System.out.println("Enter wireless interface name in managed (normal) mode");
+            bufferedWriter.write(scanner.nextLine());
+            bufferedWriter.newLine();
+            System.out.println("Enter wireless interface name in monitor mode");
+            bufferedWriter.write(scanner.nextLine());
+            bufferedWriter.close();
+        }
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(wireless_interface_file)); //read wireless interface
+        wi = bufferedReader.readLine();
+        mwi = bufferedReader.readLine();
+
+        if (args.length > 0) { //if script is run in setup mode (called by script) quit
             if (Objects.equals(args[0], "s"))
                 System.exit(0);
         }
+
+
 
         scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], ""); //get jar file dir
 
@@ -89,14 +105,8 @@ class Main {
             in = scanner.nextLine();
 
             if (in.equals("edit")) { //change wireless card name
-                System.out.println("Enter card name in standard mode: ");
-                wi = scanner.nextLine();
-                System.out.println("Done! wireless card is now: " + wi);
-
-                System.out.println("Enter card name in monitor mode: ");
-                mwi = scanner.nextLine();
-                System.out.println("Done! monitor wireless card is now: " + mwi);
-
+                wireless_interface_file.delete();
+                System.exit(0);
             }
             if (in.equals("1")) { //deauth mode
                 String[] network = getNetwork(); //get network to deauth
