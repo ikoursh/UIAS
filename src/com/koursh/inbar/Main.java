@@ -105,6 +105,7 @@ class Main {
             in = scanner.nextLine();
 
             if (in.equals("edit")) { //change wireless card name
+                //noinspection ResultOfMethodCallIgnored
                 wireless_interface_file.delete();
                 System.exit(0);
             }
