@@ -56,7 +56,7 @@ class Main {
 
         if (!execute("whoami", false).get(0).equals("root")) {
             System.out.println("run it as root");
-            executeNewWindow("sudo java -jar " + path+" "+ Arrays.toString(args).replace("[", "").replace("]", ""), false);
+            executeNewWindow("sudo java -jar " + path + " " + Arrays.toString(args).replace("[", "").replace("]", ""), false);
             System.exit(0);
         } //ensure that this script is run with su privileges
 
@@ -428,12 +428,15 @@ class Main {
 
         if (verbose)
             System.out.println("execute: " + command);
-
-
         try {
             Process p = new ProcessBuilder("/bin/sh", "-c", command).start(); //create process from command
 
-            p.waitFor(); //wait for process to complete
+            for (int i = 0; i < 60 && p.isAlive(); i++) {
+                Thread.sleep(1000);
+                if(i==30){
+                    System.out.println("This is command is taking a larger than usual time to execute, we will continue attempting to execute it but if after another 30 seconds it wont quit we will force it");
+                }
+            }
 
             BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream())); //std::out buferdreader output
             BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream())); //std::error buferdreader output
@@ -450,6 +453,7 @@ class Main {
             error.close();
         } catch (Exception ignored) {
         }
+
         if (verbose) {
             System.out.println("out: " + out);
         }
