@@ -26,18 +26,20 @@ class Main {
      */
     private static String mwi = wi + "mon";
     /**
-     * Has monitor mode been started by script
-     */
-    private static boolean monitorMde = false;
-    /**
      * Script JAR file directory
      */
     private static String scriptDIR;
 
     /**
+     * Whether program was triggered in verbose mode (debug)
+     */
+    private static boolean verbose = false;
+
+    /**
      * UIAS interface
+     *
      * @param args arg s is given so the script will only run setup and not start
-     * @throws IOException error
+     * @throws IOException        error
      * @throws URISyntaxException error
      */
     public static void main(String[] args) throws IOException, URISyntaxException {
@@ -54,14 +56,14 @@ class Main {
 
         if (!execute("whoami", false).get(0).equals("root")) {
             System.out.println("run it as root");
-            executeNewWindow("sudo java -jar " + path, false);
+            executeNewWindow("sudo java -jar " + path+" "+ Arrays.toString(args).replace("[", "").replace("]", ""), false);
             System.exit(0);
         } //ensure that this script is run with su privileges
 
         checkdep(); //check that necessary dependencies are installed
 
         File wireless_interface_file = new File("WI"); //wireless interface name file
-        if(!wireless_interface_file.exists()){ //if file doesn't exist, create it and write wireless interface and monitor wireless interface to it
+        if (!wireless_interface_file.exists()) { //if file doesn't exist, create it and write wireless interface and monitor wireless interface to it
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(wireless_interface_file));
             System.out.println("Enter wireless interface name in managed (normal) mode");
             bufferedWriter.write(scanner.nextLine());
@@ -73,12 +75,26 @@ class Main {
         BufferedReader bufferedReader = new BufferedReader(new FileReader(wireless_interface_file)); //read wireless interface
         wi = bufferedReader.readLine();
         mwi = bufferedReader.readLine();
+        bufferedReader.close();
 
-        if (args.length > 0) { //if script is run in setup mode (called by script) quit
-            if (Objects.equals(args[0], "s"))
-                System.exit(0);
+        if (contains(execute("ip a", false), mwi)) {
+            stopMonitorMode();
+        }
+        if (!contains(execute("ip a", false), wi)) {
+            System.out.println("Error finding wireless interface");
+            wireless_interface_file.delete();
+            System.exit(0);
         }
 
+        if (args.length > 0) { //if script is run in setup mode (called by script) quit
+            System.out.println("detected arg " + args[0]);
+            if (Objects.equals(args[0], "s"))
+                System.exit(0);
+            if (Objects.equals(args[0], "v")) {
+                verbose = true; //note that if System is started in setup mode verbose is unless because it is used after the program quits, therefore the program only takes the first arg and ignores any other
+                System.out.println("verbose activated");
+            }
+        }
 
 
         scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], ""); //get jar file dir
@@ -187,7 +203,9 @@ class Main {
 
 //                execute(scriptDIR+"hashcat-utils-master/src/cap2hccapx.bin "+lasttg_scan.getAbsolutePath()+" "+lasttg_scan.getAbsolutePath().replace(".cap",".hccapx"),false);
 //TODO: add gpu cracking support with hashcat
-                } catch (Exception ignored){System.out.println("Error");}
+                } catch (Exception ignored) {
+                    System.out.println("Error");
+                }
 
                 stopMonitorMode();//exit monitor mode
 
@@ -204,11 +222,16 @@ class Main {
                     macs.set(i, macs.get(i).split("\t")[1]); //add mac to arraylist
                     System.out.println(macs.get(i)); //print said mac
                 }
+                boolean success = false;
                 for (String mac : macs) {
                     if (trymac(mac)) { //try each mac
+                        success = true;
                         System.out.println("success! " + mac); //mac successful, print it
                         break;
                     }
+                }
+                if (!success) {
+                    System.out.println("Sorry, either no one purchased wifi or there is a bug in the program, try again later");
                 }
 
             }
@@ -217,26 +240,28 @@ class Main {
 
     /**
      * Get a password list
+     *
      * @return selected password list
      */
     private static String getPasswordList() {
         File lists = new File("passwd_lists");
         File[] files = lists.listFiles();
-        int i=0;
+        int i = 0;
         System.out.println("Select password list: ");
-        for(File l: Objects.requireNonNull(files)){
+        for (File l : Objects.requireNonNull(files)) {
             i++;
-            System.out.println(i+") "+l.getName());
+            System.out.println(i + ") " + l.getName());
         }
-        String pl =scanner.nextLine();
+        String pl = scanner.nextLine();
 //        if(pl.equals("c")){
 //
 //        }
-        return files[Integer.parseInt(pl)-1].getAbsolutePath();
+        return files[Integer.parseInt(pl) - 1].getAbsolutePath();
     }
 
     /**
      * Get details about network to attack
+     *
      * @return bssid, essid, chanel
      * @throws IOException error
      */
@@ -300,21 +325,19 @@ class Main {
      * Put wireless interface in monitor mode
      */
     private static void startMonitorMode() {
-        if (!monitorMde) { //if monitor mode is disabled
-            execute("airmon-ng check kill", true); //kill all processes that could interfere with monitor mode
-            execute("airmon-ng start " + wi, true); //start monitor mode
-            monitorMde = true;
-        }
+        execute("airmon-ng check kill", true); //kill all processes that could interfere with monitor mode
+        execute("airmon-ng start " + wi, true); //start monitor mode
+
     }
 
     /**
      * Set monitor wireless card chanel
+     *
      * @param ch chanel to set
      */
     private static void setChanel(String ch) {
-        if (monitorMde){
         execute("sudo iwconfig " + mwi + " channel " + ch, true); //set monitor wireless card chanel
-             }
+
     }
 
     /**
@@ -322,15 +345,15 @@ class Main {
      */
 
     private static void stopMonitorMode() {
-        if (monitorMde) {
-            execute("airmon-ng stop " + mwi, true);//stop monitor mode
-            execute("service network-manager restart", true);//restart networking service
-            monitorMde = false;
-        }
+
+        execute("airmon-ng stop " + mwi, true);//stop monitor mode
+        execute("service network-manager restart", true);//restart networking service
+
     }
 
     /**
      * Check that the programs dependencies are installed - otherwise prompt the user to install the programs dependencies and quit
+     *
      * @throws IOException error
      */
 
@@ -377,6 +400,7 @@ class Main {
 
     /**
      * Check that a certain package dependency is installed
+     *
      * @param packageS package to check
      * @return weather the package is installed
      */
@@ -391,17 +415,21 @@ class Main {
 
     /**
      * Run a bash command
+     *
      * @param command command to execute
-     * @param sudo whether to execute as root
+     * @param sudo    whether to execute as root
      * @return ArrayList of output - each entry is a line <p>note that first std:out is read, then std:error</p>
      */
     private static ArrayList<String> execute(String command, boolean sudo) {
         if (sudo) {
             command = "pkexec " + command; // if sudo is required append pkexec to the start(graphical request for sudo)
         }
-
-
         ArrayList<String> out = new ArrayList<>();
+
+        if (verbose)
+            System.out.println("execute: " + command);
+
+
         try {
             Process p = new ProcessBuilder("/bin/sh", "-c", command).start(); //create process from command
 
@@ -422,13 +450,18 @@ class Main {
             error.close();
         } catch (Exception ignored) {
         }
+        if (verbose) {
+            System.out.println("out: " + out);
+        }
+
         return out;
     }
 
     /**
      * Execute command in a window that can be interacted with by the user
+     *
      * @param command command to execute
-     * @param sudo whether to execute as root
+     * @param sudo    whether to execute as root
      */
 
     private static void executeNewWindow(String command, boolean sudo) {
@@ -441,6 +474,7 @@ class Main {
 
     /**
      * Change wireless interface mac address
+     *
      * @param mac new mac address
      */
 
@@ -452,20 +486,44 @@ class Main {
     }
 
     /**
-     * Detect if a mac address can access the internet
+     * Detect if a mac address can aatemptccess the internet
+     *
      * @param mac mac address to try
      * @return if mac has internet access
      */
     private static boolean trymac(String mac) {
+        System.out.println("trying new mac...");
         change_mac(mac); //change mac address
-        boolean conected = false; //try 5 times to check connection to network
-        for (int i = 0; i < 5 || conected; i++) {
-            conected = !execute("ping 8.8.8.8 -c 4", false).contains("connect: Network is unreachable");
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-        ArrayList<String> ping = execute("ping 8.8.8.8 -c 6", false); //ping google dns server and return !( if packet loss was 100% or ping failed)
+        boolean conected = false; //try 50 times to check connection to network
+        for (int i = 0; i < 50 && !conected; i++) {
+            if (verbose)
+                System.out.println("attempt: " + i);
+            conected = !contains(execute("ping 8.8.8.8 -c 2", false), "connect: Network is unreachable");
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        ArrayList<String> ping = execute("ping 8.8.8.8 -c 4", false); //ping google dns server and return !( if packet loss was 100% or ping failed)
         System.out.println(ping);
-        return !(ping.contains("100% packet loss") || ping.contains("connect: Network is unreachable"));
+        System.out.println(ping.contains(" 100% packet loss"));
+        return !(contains(ping, "100% packet loss") || contains(ping, "connect: Network is unreachable"));
     }
 
+
+    static boolean contains(ArrayList<String> arr, String str) {
+        for (String s : arr) {
+            if (s.contains(str)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 }
