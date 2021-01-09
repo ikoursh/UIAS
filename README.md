@@ -11,6 +11,6 @@ By using this script you confirm that you have reviewed and fully understood the
     sudo bash setup.sh 
 
 ## Docs
-### [JavaDocs](http://www.inbarkoursh.com/uias)
+### [JavaDocs](https://ikoursh.github.io/UIAS/)
 
 
