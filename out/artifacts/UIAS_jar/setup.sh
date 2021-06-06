@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo apt update
 sudo apt install default-jre
 mkdir passwd_lists
 
