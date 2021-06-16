@@ -1,7 +1,10 @@
 #!/bin/bash
 sudo apt update
-sudo apt install default-jre
+sudo apt install default-jre -y
+
+#setup directories
 mkdir passwd_lists
+mkdir tg
 mkdir scans
 
 sudo apt install curl
@@ -11,9 +14,9 @@ curl -L -o passwd_lists/rockyou.txt https://github.com/brannondorsey/naive-hashc
 echo cheking deps
 sudo java -jar UIAS.jar  s
 echo atempting to install deps
-sudo bash dep.sh
 
-echo adding script to PATH
+sudo chmod +x dep.sh
+sudo bash dep.sh
 
 echo \#\!/bin/bash > uias
 echo "java -jar "$(pwd)"/UIAS.jar">>uias
