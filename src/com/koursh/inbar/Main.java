@@ -100,7 +100,7 @@ class Main {
         scriptDIR = path.replace(path.split(File.separator)[path.split(File.separator).length - 1], ""); //get jar file dir
 
 
-        System.out.println("Success! PUIAS has been successfully started ");
+        System.out.println("Success! UIAS has been successfully started ");
         String in = "";
 
         try {
@@ -277,63 +277,64 @@ class Main {
      * Get details about network to attack
      *
      * @return bssid, essid, chanel
-     * @throws UnknownError unexpected error. Examples include: no networks in area & invalid network number.
+     * @throws UnknownError unexpected error. Examples include: no networks in area and invalid network number.
      */
 
     private static String[] getNetwork() throws UnknownError {
         try {
-        startMonitorMode();
-        String scans_path = scriptDIR + "scans" + File.separator + "scans"; //deauth initial scan absolote path
-        executeNewWindow("airodump-ng  -w " + scans_path + " --output-format csv " + mwi, true);//scan networks and get bssid and essid
-        System.out.println("press enter when done");
-        scanner.nextLine();
+            startMonitorMode();
+            String scans_path = scriptDIR + "scans" + File.separator + "scans"; //deauth initial scan absolote path
+            executeNewWindow("airodump-ng  -w " + scans_path + " --output-format csv " + mwi, true);//scan networks and get bssid and essid
+            System.out.println("press enter when done");
+            scanner.nextLine();
 
 
-        File[] scans = new File(scriptDIR + "scans").listFiles(pathname -> !pathname.isDirectory());
-        assert scans != null;
-        Arrays.sort(scans);
-        File last_scan = scans[scans.length - 1]; //get the latest scan
+            File[] scans = new File(scriptDIR + "scans").listFiles(pathname -> !pathname.isDirectory());
+            assert scans != null;
+            Arrays.sort(scans);
+            File last_scan = scans[scans.length - 1]; //get the latest scan
 
-        execute("chmod 777 " + last_scan.getAbsolutePath(), true); //allow editing of file
+            execute("chmod 777 " + last_scan.getAbsolutePath(), true); //allow editing of file
 
 
-        BufferedReader scansbr = new BufferedReader(new FileReader(last_scan));
-        String l;
-        ArrayList<String> dsi_list = new ArrayList<>();
-        while (!(l = scansbr.readLine()).equals("Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs")) {//read file until reched unasosiated bssids
-            dsi_list.add(l);
-        }
-        dsi_list.remove(0); //remove headers
-        dsi_list.remove(0);
-
-        ArrayList<String> bssids = new ArrayList<>();
-        ArrayList<String> essids = new ArrayList<>();
-        ArrayList<String> chs = new ArrayList<>();
-
-        int i = 0;
-        for (String entry : dsi_list) { //go over each entry and extract properies
-            try {
-                String[] props = entry.split(",");
-                chs.add(props[3].replace(" ", ""));
-                bssids.add(props[0]);
-                String essid = props[props.length - 2];  // essid is 1 before the last
-                essids.add(essid);
-                System.out.println(i + ". " + essid);
-
-                i++;
-            } catch (Exception ignored) {
+            BufferedReader scansbr = new BufferedReader(new FileReader(last_scan));
+            String l;
+            ArrayList<String> dsi_list = new ArrayList<>();
+            while (!(l = scansbr.readLine()).equals("Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs")) {//read file until reched unasosiated bssids
+                dsi_list.add(l);
             }
+            dsi_list.remove(0); //remove headers
+            dsi_list.remove(0);
 
-        }
-        scansbr.close();
-        System.out.println("enter network no");
+            ArrayList<String> bssids = new ArrayList<>();
+            ArrayList<String> essids = new ArrayList<>();
+            ArrayList<String> chs = new ArrayList<>();
 
-        int sn = Integer.parseInt(scanner.nextLine()); //get properties for selected network
-        String bss = bssids.get(sn);
-        String ess = essids.get(sn);
-        String ch = chs.get(sn);
-        System.out.println("Selected network: " + ess + " with a bssid: " + bss + " and a chanel: " + ch);
-        return new String[]{bss, ess, ch};} catch (Exception e){
+            int i = 0;
+            for (String entry : dsi_list) { //go over each entry and extract properties
+                try {
+                    String[] props = entry.split(",");
+                    chs.add(props[3].replace(" ", ""));
+                    bssids.add(props[0]);
+                    String essid = props[props.length - 2];  // essid is 1 before the last
+                    essids.add(essid);
+                    System.out.println(i + ". " + essid);
+
+                    i++;
+                } catch (Exception ignored) {
+                }
+
+            }
+            scansbr.close();
+            System.out.println("enter network no");
+
+            int sn = Integer.parseInt(scanner.nextLine()); //get properties for selected network
+            String bss = bssids.get(sn);
+            String ess = essids.get(sn);
+            String ch = chs.get(sn);
+            System.out.println("Selected network: " + ess + " with a bssid: " + bss + " and a chanel: " + ch);
+            return new String[]{bss, ess, ch};
+        } catch (Exception e) {
             throw new UnknownError();
         }
     }
@@ -394,19 +395,19 @@ class Main {
 
             if (!pkexec) { //for each missing package push an install line
                 bufferedWriter.newLine();
-                bufferedWriter.write("sudo apt install pkexec");
+                bufferedWriter.write("sudo apt install policykit-1 -y");
             }
             if (!macchanger) {
                 bufferedWriter.newLine();
-                bufferedWriter.write("sudo apt install macchanger");
+                bufferedWriter.write("sudo apt install macchanger -y");
             }
             if (!arpscan) {
                 bufferedWriter.newLine();
-                bufferedWriter.write("sudo apt install arp-scan");
+                bufferedWriter.write("sudo apt install arp-scan -y");
             }
             if (!aircrack) {
                 bufferedWriter.newLine();
-                bufferedWriter.write("sudo apt install aircrack-ng");
+                bufferedWriter.write("sudo apt install aircrack-ng -y");
             }
             bufferedWriter.close();
             System.out.println("please run: 'chmod +x dep.sh' and 'sudo bash dep.sh' (two commands, no quotes)"); //print execution instructions
@@ -419,7 +420,7 @@ class Main {
      * Check that a certain package dependency is installed
      *
      * @param packageS package to check
-     * @return weather the package is installed
+     * @return whether the package is installed
      */
 
     private static boolean checkpackage(String packageS) {
@@ -507,7 +508,7 @@ class Main {
     }
 
     /**
-     * Detect if a mac address can aatemptccess the internet
+     * Detect if a mac address can access the internet
      *
      * @param mac mac address to try
      * @return if mac has internet access
@@ -537,7 +538,13 @@ class Main {
         return !(contains(ping, "100% packet loss") || contains(ping, "connect: Network is unreachable"));
     }
 
-
+    /**
+     * Check if an arraylist contains a string.
+     *
+     * @param arr array of string to check
+     * @param str string to check
+     * @return boolean value if string is contained in the arraylist
+     */
     static boolean contains(ArrayList<String> arr, String str) {
         for (String s : arr) {
             if (s.contains(str)) {
